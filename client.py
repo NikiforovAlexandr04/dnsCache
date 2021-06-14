@@ -1,19 +1,31 @@
 import json
 import socket
+from scapy.layers.dns import *
 
 
-class Client:
-    def start_send(self):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        while True:
-            user_request = input()
-            sock.sendto(user_request.encode(), ('127.0.0.1', 53))
-            request = sock.recv(2000)
-            response = json.loads(request)
-            print('name: ' + response['name'] + '  type: ' + response['type'] + '  TTL: ' + str(response['ttl'])
-                  + '  data: ' + str(response['data']))
+def get_type(type):
+    if type == 2:
+        type_rec = "NS"
+    elif type == 1:
+        type_rec = "A"
+    elif type == 12:
+        type_rec = "PTR"
+    else:
+        type_rec = "AAAA"
+    return type_rec
 
 
 if __name__ == '__main__':
-    client = Client()
-    client.start_send()
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    dns = DNSQR(qname='google.com'.encode(), qtype='A')
+    message = DNS(qd=dns).build()
+    sock.sendto(message, ('127.0.0.1', 53))
+    answer, address = sock.recvfrom(2000)
+    package = DNS(_pkt=answer)
+    print("name: " + package.qd.qname.decode())
+    print("type: " + get_type(package.qd.qtype))
+    print("answer: " + package.payload.load[:len(package.payload)].decode())
+    if package.ns is not None:
+        print("authority: " + package.fields['ns'])
+    if package.ar is not None:
+        print("addition: " + package.fields['ar'])
