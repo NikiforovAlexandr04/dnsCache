@@ -1,6 +1,7 @@
 import json
 import socket
 from json import JSONDecodeError
+import base64
 
 from scapy.layers.dns import *
 
@@ -20,14 +21,16 @@ class Server:
             name = packet.fields['qd'].qname
             type_r = self.get_type(type_r)
             in_cache = False
-            for rec in self.cache:
-                if rec['name'] == name.decode() and rec['type'] == type_r:
-                    in_cache = True
-                    message = self.build_message(rec)
-                    sock.sendto(message, address)
-                    break
+            for recording in self.cache:
+                if name.decode() in recording:
+                    rec = recording[name.decode()]
+                    if rec[0] == type_r:
+                        in_cache = True
+                        packet.fields['ancount'] = rec[1]
+                        packet.fields['an'] = DNSRR(rrname=name, type=rec[0], rdata=rec[2])
+                        sock.sendto(packet.build(), address)
             if not in_cache:
-                self.send_message(name, type_r, sock_request, sock, address, data)
+                self.send_message(name, type_r, sock_request, sock, address, packet)
 
     def get_type(self, type):
         if type == 2:
@@ -40,44 +43,38 @@ class Server:
             type_rec = "AAAA"
         return type_rec
 
-    def create_message(self, recording):
-        type_rec = self.get_type(recording.an.type)
-        message = {
-            'name': recording.an.rrname.decode(),
-            'type': type_rec,
-            'ttl': recording.an.ttl,
-            'current_ttl': time.time()
-        }
-        an = recording.an.rdata
-        message['an'] = an
-        ns = recording.ns
-        message['ns'] = ns
-        ar = recording.ar
-        message['ar'] = ar
-        return message
-
-    def build_message(self, message):
-        build_message = DNSQR(qname=message['name'], qtype=message['type'])
-        mes = DNS(qd=build_message, an=message['an'], ns=message['ns'], ar=message['ar'])
-        return mes.build()
-
     def send_message(self, name, type_r, sock_request, sock, address, data):
+        name = name.decode()
         if type_r == "PTR":
             name = name.split('.')
             name = name[3] + '.' + name[2] + '.' + name[1] + '.' + name[0] + '.in-addr.arpa'
-        dns = DNSQR(qname=name, qtype=type_r)
-        message = DNS(qd=dns)
-        sock_request.sendto(message.build(), ("8.8.8.8", 53))
+        qd = DNSQR(qname=name.encode(), qtype=type_r)
+        data.fields['qd'] = qd
+        sock_request.sendto(data.build(), ("8.8.8.8", 53))
         response = sock_request.recv(2000)
         out = DNS(_pkt=response)
-        rec = self.create_message(out)
+        print(out.fields)
+        data.fields['an'] = out.fields['an']
+        data.fields['ancount'] = out.fields['ancount']
+        sock.sendto(data.build(), address)
+        self.cache_data(out, name, type_r)
 
-        message = self.build_message(rec)
-        sock.sendto(message, address)
-        self.cache_data(rec)
-
-    def cache_data(self, rec):
-        self.cache.append(rec)
+    def cache_data(self, recording, name, type):
+        an = recording.fields['an']
+        ns = recording.fields['ns']
+        ar = recording.fields['ar']
+        if an is not None:
+            if type == 'PTR':
+                self.cache.append({name: ['A', recording.fields['ancount'], an.rdata.decode(), an.ttl, time.time()]})
+            else:
+                self.cache.append({name: ['A', recording.fields['ancount'], an.rdata, an.ttl, time.time()]})
+        if ns is not None:
+            try:
+                self.cache.append({name: ['NS', recording.fields['nscount'], ns.rdata, an.ttl, time.time()]})
+            except AttributeError:
+                pass
+        if ar is not None:
+            self.cache.append({name: ['AAAA', recording.fields['arcount'], ar.rdata]})
         with open("cache.json", mode="w") as file:
             file.write(json.dumps(self.cache))
 
@@ -88,8 +85,9 @@ def read_cache():
         with open('cache.json', mode='r') as file:
             file = json.load(file)
             for rec in file:
-                if rec['ttl'] + rec['current_ttl'] < time.time():
-                    cache.append(rec)
+                for key in rec:
+                    if rec[key][3] + rec[key][4] < time.time():
+                        cache.append(rec)
     except JSONDecodeError:
         pass
     dns = Server(cache)
