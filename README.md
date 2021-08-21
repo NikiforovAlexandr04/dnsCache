@@ -7,4 +7,7 @@ python server.py и python client.py
 затем в процессе с запущенным клиеном можно выполнять запросы
 Записи кэшируются в файле cache.json который изначально пуст
  # Примеры запуска
- ![image](https://user-images.githubusercontent.com/58898465/120538295-c38ff380-c3ff-11eb-9183-953d1be443e0.png)
+ ![image](https://user-images.githubusercontent.com/58898465/130331476-2ff33e8b-d5f0-4109-8654-d83861b3d9ce.png)
+
+
+![image](https://user-images.githubusercontent.com/58898465/130331455-9dd7a82a-8fa4-4885-b682-99f67030f599.png)
