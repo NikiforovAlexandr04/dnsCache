@@ -9,5 +9,5 @@ python server.py и python client.py
  # Примеры запуска
  ![image](https://user-images.githubusercontent.com/58898465/130331476-2ff33e8b-d5f0-4109-8654-d83861b3d9ce.png)
 
-
+# В процессе работы записи кэшируются в файл cache.json
 ![image](https://user-images.githubusercontent.com/58898465/130331455-9dd7a82a-8fa4-4885-b682-99f67030f599.png)
