@@ -53,7 +53,6 @@ class Server:
         sock_request.sendto(data.build(), ("8.8.8.8", 53))
         response = sock_request.recv(2000)
         out = DNS(_pkt=response)
-        print(out.fields)
         data.fields['an'] = out.fields['an']
         data.fields['ancount'] = out.fields['ancount']
         sock.sendto(data.build(), address)
